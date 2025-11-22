@@ -70,6 +70,7 @@ add_executable(RoboCar
     imu.c
     servo_control.c       # <-- ADDED
     ultrasonic_sensor.c   # <-- ADDED
+    barcode_direction.c   # <-- ADDED: CODE39 barcode direction detection
 )
 
 # Add the current directory so main.c can find headers
