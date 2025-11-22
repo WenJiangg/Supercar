@@ -252,4 +252,24 @@ bool barcode_direction_is_scanning(void);
  */
 void barcode_direction_reset(void);
 
+/**
+ * @brief Get statistics about the last successful scan
+ *
+ * @param avg_bar_width_us Average bar width in microseconds (for speed estimation)
+ * @return true if statistics are available
+ */
+bool barcode_get_last_scan_stats(uint32_t* avg_bar_width_us);
+
+/**
+ * @brief Estimate scanning speed based on bar widths
+ *
+ * Helps verify if robot speed is optimal for barcode reading.
+ * Optimal range: 8-12 cm/s
+ *
+ * @param avg_bar_width_us Average bar width from scan
+ * @param nominal_bar_mm Nominal bar width in mm (typically 1.0-2.0mm)
+ * @return Estimated speed in cm/s (or -1 if calculation invalid)
+ */
+float barcode_estimate_speed_cm_s(uint32_t avg_bar_width_us, float nominal_bar_mm);
+
 #endif // BARCODE_DIRECTION_H

@@ -121,6 +121,7 @@ static bool last_sensor_state_continuous = false;
 static absolute_time_t last_transition_time;
 static uint32_t stable_white_time_us = 0;
 static bool continuous_scanning_enabled = false;
+static uint32_t last_scan_avg_bar_width_us = 0;  // For speed estimation
 
 #define BARCODE_END_TIMEOUT_US  15000  // 15ms of white = end of barcode
 #define BARCODE_START_MIN_US    100    // Minimum width to start barcode
@@ -603,6 +604,9 @@ barcode_result_t* barcode_direction_update(void) {
             if (continuous_result.status == BC_STATUS_OK) {
                 continuous_result.data_length = strlen(continuous_result.data);
                 continuous_result.move_dir = determine_movement_direction(continuous_result.data);
+
+                // Store average bar width for speed estimation
+                last_scan_avg_bar_width_us = continuous_result.avg_narrow_width_us;
             } else {
                 continuous_result.data_length = 0;
                 continuous_result.move_dir = MOVE_NONE;
@@ -778,4 +782,39 @@ static movement_direction_t determine_movement_direction(const char* data) {
     }
 
     return MOVE_NONE;
+}
+
+// ==============================================================================
+// Speed Monitoring Functions
+// ==============================================================================
+
+bool barcode_get_last_scan_stats(uint32_t* avg_bar_width_us) {
+    if (last_scan_avg_bar_width_us == 0) {
+        return false;
+    }
+
+    if (avg_bar_width_us) {
+        *avg_bar_width_us = last_scan_avg_bar_width_us;
+    }
+
+    return true;
+}
+
+float barcode_estimate_speed_cm_s(uint32_t avg_bar_width_us, float nominal_bar_mm) {
+    if (avg_bar_width_us == 0 || nominal_bar_mm <= 0) {
+        return -1.0f;
+    }
+
+    // Speed = Distance / Time
+    // avg_bar_width_us is the time to cross one bar in microseconds
+    // nominal_bar_mm is the physical width of the bar in millimeters
+    //
+    // speed (mm/s) = nominal_bar_mm / (avg_bar_width_us / 1,000,000)
+    // speed (cm/s) = speed (mm/s) / 10
+
+    float time_seconds = (float)avg_bar_width_us / 1000000.0f;
+    float speed_mm_s = nominal_bar_mm / time_seconds;
+    float speed_cm_s = speed_mm_s / 10.0f;
+
+    return speed_cm_s;
 }

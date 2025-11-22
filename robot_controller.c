@@ -514,19 +514,39 @@ void robot_controller_run_loop(void)
                 const char* dir_str = barcode_direction_string(bc_result->move_dir);
                 const char* scan_str = barcode_scan_direction_string(bc_result->scan_dir);
 
-                robot_log("\n🔍 BARCODE DETECTED: \"%s\" | %s | Scan: %s\n",
+                // Estimate scanning speed (assuming 1.5mm nominal bar width)
+                uint32_t avg_bar_us = 0;
+                float estimated_speed = -1.0f;
+                if(barcode_get_last_scan_stats(&avg_bar_us)){
+                    estimated_speed = barcode_estimate_speed_cm_s(avg_bar_us, 1.5f);
+                }
+
+                robot_log("\n🔍 BARCODE DETECTED: \"%s\" | %s | Scan: %s",
                          bc_result->data, dir_str, scan_str);
+                if(estimated_speed > 0){
+                    robot_log(" | Speed: %.1f cm/s", estimated_speed);
+                    if(estimated_speed < 8.0f){
+                        robot_log(" (slow)");
+                    } else if(estimated_speed > 12.0f){
+                        robot_log(" (fast!)");
+                    } else {
+                        robot_log(" (optimal)");
+                    }
+                }
+                robot_log("\n");
 
                 // Publish to MQTT
                 if(mqtt_is_connected()){
-                    char bc_payload[256];
+                    char bc_payload[300];
                     snprintf(bc_payload, sizeof(bc_payload),
-                        "{\"barcode\":\"%s\",\"direction\":\"%s\",\"scan_dir\":\"%s\",\"move_dir\":%d,\"bar_count\":%d}",
+                        "{\"barcode\":\"%s\",\"direction\":\"%s\",\"scan_dir\":\"%s\","
+                        "\"move_dir\":%d,\"bar_count\":%d,\"speed_cm_s\":%.2f}",
                         bc_result->data,
                         dir_str,
                         scan_str,
                         (int)bc_result->move_dir,
-                        bc_result->bar_count
+                        bc_result->bar_count,
+                        estimated_speed
                     );
                     robot_mqtt_publish_qos("robocar/barcode", bc_payload, 1, 1);
                 }
