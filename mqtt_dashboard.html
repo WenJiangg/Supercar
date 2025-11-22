@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RoboPico Dashboard</title>
+  <style>
+    :root {
+      --bg: #0a0e15;
+      --card: #151921;
+      --card-accent: #1a2028;
+      --text: #e8eef5;
+      --muted: #8b98ab;
+      --accent: #00d4ff;
+      --accent-glow: rgba(0, 212, 255, 0.3);
+      --good: #00ff88;
+      --warn: #ffaa00;
+      --danger: #ff3366;
+      --grid: #1e252f;
+      --speedometer-bg: radial-gradient(circle, #0d1117 0%, #050810 100%);
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body { 
+      margin: 0; 
+      font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif; 
+      background: var(--bg); 
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+    }
+    
+    /* Header */
+    header { 
+      padding: 16px 24px; 
+      border-bottom: 2px solid var(--grid); 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between;
+      height: 70px;
+      background: linear-gradient(180deg, #0f1319 0%, #0a0e15 100%);
+    }
+    
+    h1 { 
+      font-size: 20px; 
+      letter-spacing: 1px; 
+      font-weight: 700;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, var(--accent) 0%, #00ff88 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    /* Tab Navigation */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg);
+      padding: 0 24px;
+      border-bottom: 2px solid var(--grid);
+      height: 50px;
+    }
+    
+    .tab {
+      padding: 12px 24px;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .tab:hover { 
+      color: var(--text); 
+      background: rgba(255, 255, 255, 0.02);
+    }
+    
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      box-shadow: 0 -2px 20px var(--accent-glow);
+    }
+    
+    /* Tab Content */
+    .tab-content {
+      display: none;
+      height: calc(100vh - 120px);
+      overflow-y: auto;
+    }
+    .tab-content.active { display: block; }
+    
+    /* Dashboard Grid - Car Layout */
+    .dashboard {
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(12, 1fr);
+      grid-auto-rows: minmax(100px, auto);
+      height: 100%;
+    }
+    
+    .card { 
+      background: var(--card); 
+      border: 1px solid var(--grid); 
+      border-radius: 16px; 
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s;
+    }
+    
+    .card:hover {
+      border-color: rgba(0, 212, 255, 0.3);
+      box-shadow: 0 4px 20px rgba(0, 212, 255, 0.1);
+    }
+    
+    /* Grid sizes */
+    .g2 { grid-column: span 2; }
+    .g3 { grid-column: span 3; }
+    .g4 { grid-column: span 4; }
+    .g5 { grid-column: span 5; }
+    .g6 { grid-column: span 6; }
+    .g7 { grid-column: span 7; }
+    .g8 { grid-column: span 8; }
+    .g12 { grid-column: span 12; }
+    .row2 { grid-row: span 2; }
+    .row3 { grid-row: span 3; }
+    
+    /* Connection Bar */
+    .conn-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--card-accent);
+      border-radius: 10px;
+      border: 1px solid var(--grid);
+    }
+    
+    .conn-bar input {
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid #2a3441;
+      background: #0a0e15;
+      color: var(--text);
+      padding: 0 12px;
+      font-size: 13px;
+      flex: 1;
+      min-width: 0;
+      transition: all 0.2s;
+    }
+    
+    .conn-bar input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    
+    .conn-bar button {
+      height: 36px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #000;
+      padding: 0 18px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .conn-bar button:hover {
+      background: #00e5ff;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    
+    .conn-bar button.secondary {
+      background: #2a3441;
+      border: 1px solid #3a4658;
+      color: var(--text);
+    }
+    
+    .conn-bar button.secondary:hover {
+      background: #3a4658;
+      box-shadow: none;
+    }
+    
+    /* KPI Cards - Speedometer Style */
+    .kpi {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+    
+    .kpi-header {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+    
+    .kpi-value {
+      font-size: 42px;
+      font-weight: 700;
+      font-family: 'Courier New', ui-monospace, monospace;
+      line-height: 1;
+      margin: auto 0;
+      text-shadow: 0 0 20px var(--accent-glow);
+    }
+    
+    .kpi-value.large {
+      font-size: 56px;
+    }
+    
+    .kpi-unit {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+      font-weight: 500;
+    }
+    
+    .kpi-value.good { color: var(--good); }
+    .kpi-value.warn { color: var(--warn); }
+    .kpi-value.danger { color: var(--danger); }
+    .kpi-value.accent { color: var(--accent); }
+    
+    /* Main Speedometer - Center Display */
+    .speedometer-main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      background: var(--speedometer-bg);
+      border-radius: 16px;
+      position: relative;
+      padding: 20px;
+    }
+    
+    .speed-display {
+      font-size: 72px;
+      font-weight: 900;
+      font-family: 'Courier New', monospace;
+      color: var(--accent);
+      text-shadow: 0 0 30px var(--accent-glow), 0 0 50px var(--accent-glow);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    
+    .speed-label {
+      font-size: 18px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 600;
+    }
+    
+    /* Compass */
+    .compass-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+    }
+    
+    .compass {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #0a0e15 0%, #050810 100%);
+      border: 3px solid var(--grid);
+      position: relative;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 212, 255, 0.1);
+    }
+    
+    .compass-needle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 50px;
+      background: linear-gradient(180deg, var(--danger) 0%, var(--accent) 100%);
+      transform-origin: bottom center;
+      transition: transform 0.3s ease;
+      border-radius: 2px;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    
+    .compass-label {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      color: var(--accent);
+      text-shadow: 0 0 10px var(--accent-glow);
+    }
+    
+    /* Status */
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      background: #555;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    
+    .status-dot.ok { 
+      background: var(--good); 
+      box-shadow: 0 0 12px var(--good);
+    }
+    
+    .status-dot.bad { 
+      background: var(--danger); 
+      box-shadow: 0 0 12px var(--danger);
+    }
+    
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1a2937;
+      border: 1px solid #2a3f52;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+      display: inline-block;
+    }
+    
+    /* Indicator lights */
+    .indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--card-accent);
+      border-radius: 8px;
+      border: 1px solid var(--grid);
+    }
+
+    .indicator-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--muted);
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .indicator-dot.active {
+      background: var(--good);
+      box-shadow: 0 0 16px var(--good);
+    }
+
+    .indicator-text {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Barcode Command Display */
+    .barcode-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      background: var(--speedometer-bg);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .barcode-command {
+      font-size: 48px;
+      font-weight: 900;
+      font-family: 'Courier New', monospace;
+      color: var(--warn);
+      text-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .barcode-icon {
+      font-size: 64px;
+      margin-bottom: 8px;
+    }
+
+    .barcode-label {
+      font-size: 14px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    /* Robot State Display */
+    .state-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .state-text {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .state-icon {
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+
+    /* Servo Angle Indicator */
+    .servo-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+    }
+
+    .servo-visual {
+      width: 100px;
+      height: 60px;
+      position: relative;
+      background: var(--card-accent);
+      border-radius: 8px;
+      border: 2px solid var(--grid);
+    }
+
+    .servo-arm {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      width: 4px;
+      height: 40px;
+      background: var(--accent);
+      transform-origin: bottom center;
+      transition: transform 0.3s ease;
+      border-radius: 2px;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    
+    /* Logs Tab */
+    .logs-container {
+      padding: 24px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .log-section {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .log-section.table-log { height: 40%; }
+    .log-section.event-log { height: 30%; }
+    .log-section.telemetry-log { height: 30%; }
+    
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .log-header strong {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+    
+    .log-content {
+      flex: 1;
+      overflow: auto;
+      background: var(--card);
+      border: 1px solid var(--grid);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--grid);
+      font-size: 12px;
+    }
+    
+    th {
+      background: var(--card-accent);
+      color: var(--accent);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    td {
+      font-family: 'Courier New', monospace;
+      color: var(--text);
+    }
+    
+    tr:hover {
+      background: rgba(0, 212, 255, 0.05);
+    }
+    
+    pre {
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      line-height: 1.6;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .btn-small {
+      padding: 6px 14px;
+      background: var(--card-accent);
+      border: 1px solid var(--grid);
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+    }
+    
+    .btn-small:hover {
+      background: var(--danger);
+      border-color: var(--danger);
+      box-shadow: 0 0 12px rgba(255, 51, 102, 0.3);
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: var(--grid);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--muted);
+    }
+
+    /* IMU Data Display */
+    .imu-data {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .imu-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: var(--card-accent);
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .imu-label {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .imu-value {
+      color: var(--text);
+    }
+  </style>
+  <script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <h1> RoboPico Dashboard</h1>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span class="status-dot" id="connDot"></span>
+      <span id="connText" style="font-size: 13px; font-weight: 600;">Disconnected</span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="control">Dashboard</button>
+    <button class="tab" data-tab="logs">Logs</button>
+  </div>
+
+  <div class="tab-content active" id="control">
+    <div class="dashboard">
+      
+      <!-- Connection Bar -->
+      <div class="card g12">
+        <div class="conn-bar">
+          <input type="text" id="brokerUrl" value="ws://localhost:9001" placeholder="Broker URL" />
+          <input type="text" id="topic" value="robot/telemetry" placeholder="Telemetry Topic" style="flex: 0.8;" />
+          <button id="btnConnect">Connect</button>
+          <button id="btnDisconnect" class="secondary">Disconnect</button>
+        </div>
+      </div>
+
+      <!-- Barcode Command Display -->
+      <div class="card g4 row2">
+        <div class="barcode-display">
+          <div class="barcode-label">Last Barcode Command</div>
+          <div class="barcode-command" id="barcodeCmd">NONE</div>
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--grid); width: 100%;">
+            <div class="barcode-label">Decoded Character</div>
+            <div style="font-size: 36px; font-weight: 900; font-family: 'Courier New', monospace; color: var(--accent); margin-top: 8px;" id="barcodeChar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Speed Display -->
+      <div class="card g4 row2">
+        <div class="speedometer-main">
+          <div class="speed-display" id="kpiSpeed">0.0</div>
+          <div class="speed-label">cm/s</div>
+          <div class="kpi-unit" style="margin-top: 20px; text-align: center; color: var(--accent);">
+            Average Speed
+          </div>
+        </div>
+      </div>
+
+      <!-- Robot State -->
+      <div class="card g4 row2">
+        <div class="state-display">
+          <div class="state-icon"></div>
+          <div class="kpi-header">Robot State</div>
+          <div class="state-text" id="robotState">IDLE</div>
+        </div>
+      </div>
+
+      <!-- Total Distance -->
+      <div class="card g3">
+        <div class="kpi">
+          <div class="kpi-header"> Total Distance</div>
+          <div class="kpi-value good" id="totalDist">0.00</div>
+          <div class="kpi-unit">Meters traveled</div>
+        </div>
+      </div>
+
+      <!-- Left Wheel Stats -->
+      <div class="card g2">
+        <div class="kpi">
+          <div class="kpi-header"> L RPM</div>
+          <div class="kpi-value accent" id="kpiLeftRPM">0.0</div>
+          <div class="kpi-unit">RPM</div>
+        </div>
+      </div>
+
+      <div class="card g2">
+        <div class="kpi">
+          <div class="kpi-header"> L Dist</div>
+          <div class="kpi-value good" id="kpiLeftDist">0.00</div>
+          <div class="kpi-unit">Meters</div>
+        </div>
+      </div>
+
+      <!-- Right Wheel Stats -->
+      <div class="card g2">
+        <div class="kpi">
+          <div class="kpi-header"> R RPM</div>
+          <div class="kpi-value accent" id="kpiRightRPM">0.0</div>
+          <div class="kpi-unit">RPM</div>
+        </div>
+      </div>
+
+      <div class="card g2">
+        <div class="kpi">
+          <div class="kpi-header"> R Dist</div>
+          <div class="kpi-value good" id="kpiRightDist">0.00</div>
+          <div class="kpi-unit">Meters</div>
+        </div>
+      </div>
+
+      <!-- Compass/Heading -->
+      <div class="card g3 row2">
+        <div class="kpi-header" style="text-align: center;"> HEADING</div>
+        <div class="compass-container">
+          <div class="compass">
+            <div id="compassNeedle" class="compass-needle"></div>
+          </div>
+          <div class="compass-label"><span id="kpiHeading">0</span>deg</div>
+        </div>
+      </div>
+
+      <!-- Obstacle Detection -->
+      <div class="card g3">
+        <div class="kpi">
+          <div class="kpi-header"> Obstacle Distance</div>
+          <div class="kpi-value warn" id="kpiDist">--</div>
+          <div class="kpi-unit">Centimeters</div>
+        </div>
+      </div>
+
+      <div class="card g3">
+        <div class="kpi">
+          <div class="kpi-header"> Obstacle Width</div>
+          <div class="kpi-value" id="kpiWidth">--</div>
+          <div class="kpi-unit">Centimeters</div>
+        </div>
+      </div>
+
+      <!-- Clearance Path -->
+      <div class="card g3">
+        <div class="kpi">
+          <div class="kpi-header"> Clearance Path</div>
+          <div class="kpi-value accent" style="font-size: 32px;" id="clearancePath">--</div>
+          <div class="kpi-unit">Direction</div>
+        </div>
+      </div>
+
+      <!-- Line Following -->
+      <div class="card g3">
+        <div class="kpi">
+          <div class="kpi-header"> Line Status</div>
+          <div class="indicator">
+            <div class="indicator-dot" id="lineIndicator"></div>
+            <div class="indicator-text" id="kpiLine">OFF</div>
+          </div>
+          <div class="kpi-unit" style="margin-top: 12px;">
+            ADC: <span id="kpiADC" style="font-family: 'Courier New', monospace; color: var(--accent);">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMU Acceleration Data -->
+      <div class="card g5">
+        <div class="kpi-header"> IMU Acceleration</div>
+        <div class="imu-data">
+          <div class="imu-row">
+            <span class="imu-label">Accel X:</span>
+            <span class="imu-value" id="accelX">0.00 g</span>
+          </div>
+          <div class="imu-row">
+            <span class="imu-label">Accel Y:</span>
+            <span class="imu-value" id="accelY">0.00 g</span>
+          </div>
+          <div class="imu-row">
+            <span class="imu-label">Accel Z:</span>
+            <span class="imu-value" id="accelZ">0.00 g</span>
+          </div>
+          <div class="imu-row">
+            <span class="imu-label">Tilt Angle:</span>
+            <span class="imu-value" id="kpiTilt">0.0deg</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMU Heading (Raw vs Filtered) -->
+      <div class="card g3">
+        <div class="kpi-header"> IMU Heading Filter</div>
+        <div class="imu-data">
+          <div class="imu-row">
+            <span class="imu-label">Raw Heading:</span>
+            <span class="imu-value" id="rawHeading">0deg</span>
+          </div>
+          <div class="imu-row">
+            <span class="imu-label">Filtered Heading:</span>
+            <span class="imu-value" id="filteredHeading">0deg</span>
+          </div>
+          <div class="imu-row">
+            <span class="imu-label">Filter Difference:</span>
+            <span class="imu-value" id="filterDiff">0deg</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="tab-content" id="logs">
+    <div class="logs-container">
+      
+      <div class="log-section table-log">
+        <div class="log-header">
+          <strong> Telemetry Data Table</strong>
+          <button id="btnClearTbl" class="btn-small">Clear</button>
+        </div>
+        <div class="log-content">
+          <table id="evtTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>State</th>
+                <th>Barcode</th>
+                <th>Char</th>
+                <th>Speed</th>
+                <th>Total Dist</th>
+                <th>L RPM</th>
+                <th>R RPM</th>
+                <th>Obst</th>
+                <th>Width</th>
+                <th>Clearance</th>
+                <th>Line</th>
+                <th>Heading</th>
+                <th>Servo</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div class="log-section event-log">
+         <div class="log-header">
+           <strong> Robot Event Log (Serial Monitor)</strong>
+           <button id="btnClearEvent" class="btn-small">Clear</button>
+         </div>
+         <div class="log-content"> <pre id="logEvent"></pre> </div>
+       </div>
+
+      <div class="log-section telemetry-log">
+         <div class="log-header">
+           <strong> Raw JSON Payload (Telemetry)</strong>
+           <button id="btnClearTelem" class="btn-small">Clear</button>
+         </div>
+         <div class="log-content"> <pre id="logTelemetry"></pre> </div>
+       </div>
+
+    </div>
+  </div>
+
+<script>
+(() => {
+  let client = null;
+  const el = (id) => document.getElementById(id);
+  
+  // Log Elements
+  const logEventEl = el('logEvent');
+  const logTelemetryEl = el('logTelemetry');
+  const evtTableBody = el('evtTable').querySelector('tbody');
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  function setConnState(ok, text) {
+    el('connDot').className = 'status-dot ' + (ok ? 'ok' : 'bad');
+    el('connText').textContent = text || (ok ? 'Connected' : 'Disconnected');
+  }
+
+  function appendToLog(logEl, s) {
+    if (logEl) {
+        logEl.textContent += s; 
+        logEl.scrollTop = logEl.scrollHeight;
+        if (logEl.textContent.length > 15000) { 
+            logEl.textContent = logEl.textContent.slice(-15000); 
+        }
+    } else {
+        console.warn("Log element not found!");
+    }
+  }
+
+  function appendTableRow(d) {
+    const tr = document.createElement('tr');
+    const fmt = (v, dec = 1) => Number.isFinite(v) ? v.toFixed(dec) : '';
+    const str = (v) => v || '';
+    
+    tr.innerHTML = `
+      <td>${new Date().toLocaleTimeString()}</td>
+      <td>${str(d.state)}</td>
+      <td>${str(d.barcode_cmd)}</td>
+      <td>${str(d.barcode_char)}</td>
+      <td>${fmt(d.avg_cm_s)}</td>
+      <td>${fmt(d.total_dist_m, 2)}</td>
+      <td>${fmt(d.left_rpm)}</td>
+      <td>${fmt(d.right_rpm)}</td>
+      <td>${fmt(d.distance_cm)}</td>
+      <td>${fmt(d.width_cm)}</td>
+      <td>${str(d.clearance_path)}</td>
+      <td>${d.on_line === 1 ? 'ON' : 'OFF'}</td>
+      <td>${fmt(d.heading, 0)}deg</td>
+      <td>${fmt(d.servo_angle, 0)}deg</td>
+    `;
+    if (evtTableBody) {
+        evtTableBody.insertBefore(tr, evtTableBody.firstChild);
+        if (evtTableBody.rows.length > 100) evtTableBody.deleteRow(-1);
+    }
+  }
+
+  function connectWS() {
+    const url = el('brokerUrl').value.trim();
+    const telemetryTopic = el('topic').value.trim();
+    const logTopic = 'robot/log';
+    const cid = 'dash-' + Math.random().toString(16).slice(2, 10);
+
+    try {
+      client = mqtt.connect(url, { clientId: cid, clean: true });
+    } catch (e) {
+      appendToLog(logEventEl, 'Connect error: ' + e.message + '\n');
+      return;
+    }
+
+    client.on('connect', () => {
+      setConnState(true);
+      appendToLog(logEventEl, '[Dashboard] Connected to ' + url + '\n');
+      client.subscribe(telemetryTopic, { qos: 0 }, err => {
+        if (!err) appendToLog(logEventEl, '[Dashboard] Subscribed to ' + telemetryTopic + '\n');
+      });
+      client.subscribe(logTopic, { qos: 0 }, err => {
+        if (!err) appendToLog(logEventEl, '[Dashboard] Subscribed to ' + logTopic + '\n');
+      });
+    });
+
+    client.on('close', () => setConnState(false));
+    client.on('error', e => appendToLog(logEventEl, '[Dashboard Error] ' + e.message + '\n'));
+
+    client.on('message', (t, payload) => {
+      const txt = payload.toString();
+      const currentTelemetryTopic = el('topic').value.trim();
+      const currentLogTopic = 'robot/log';
+
+      try {
+        if (t === currentTelemetryTopic) {
+          appendToLog(logTelemetryEl, txt + '\n');
+          const d = JSON.parse(txt);
+
+          // Update Robot State
+          if (d.state) {
+            el('robotState').textContent = d.state.toUpperCase();
+          }
+
+          // Update Barcode Command
+          if (d.barcode_cmd) {
+            el('barcodeCmd').textContent = d.barcode_cmd.toUpperCase();
+            // Add visual feedback based on command
+            const barcodeEl = el('barcodeCmd');
+            barcodeEl.style.color = 
+              d.barcode_cmd === 'LEFT' ? '#00d4ff' :
+              d.barcode_cmd === 'RIGHT' ? '#00ff88' :
+              d.barcode_cmd === 'STOP' ? '#ff3366' :
+              d.barcode_cmd === 'U-TURN' ? '#ffaa00' : '#ffaa00';
+          }
+
+          // Update Barcode Decoded Character
+          if (d.barcode_char) {
+            el('barcodeChar').textContent = d.barcode_char;
+          }
+
+          // Update Speed
+          if (Number.isFinite(d.avg_cm_s)) el('kpiSpeed').textContent = d.avg_cm_s.toFixed(1);
+          
+          // Update Total Distance
+          if (Number.isFinite(d.total_dist_m)) {
+            el('totalDist').textContent = d.total_dist_m.toFixed(2);
+          } else if (Number.isFinite(d.left_dist_m) && Number.isFinite(d.right_dist_m)) {
+            // Calculate average if total not provided
+            const avgDist = (d.left_dist_m + d.right_dist_m) / 2;
+            el('totalDist').textContent = avgDist.toFixed(2);
+          }
+
+          // Update Wheel Data
+          if (Number.isFinite(d.left_rpm)) el('kpiLeftRPM').textContent = d.left_rpm.toFixed(1);
+          if (Number.isFinite(d.right_rpm)) el('kpiRightRPM').textContent = d.right_rpm.toFixed(1);
+          if (Number.isFinite(d.left_dist_m)) el('kpiLeftDist').textContent = d.left_dist_m.toFixed(2);
+          if (Number.isFinite(d.right_dist_m)) el('kpiRightDist').textContent = d.right_dist_m.toFixed(2);
+          
+          // Update Obstacle Data
+          if (Number.isFinite(d.distance_cm)) el('kpiDist').textContent = d.distance_cm.toFixed(1);
+          if (Number.isFinite(d.width_cm)) el('kpiWidth').textContent = d.width_cm.toFixed(1);
+          
+          // Update Clearance Path
+          if (d.clearance_path) {
+            el('clearancePath').textContent = d.clearance_path.toUpperCase();
+            // Add visual feedback based on direction
+            const clearanceEl = el('clearancePath');
+            clearanceEl.style.color = 
+              d.clearance_path === 'LEFT' ? '#00d4ff' :
+              d.clearance_path === 'RIGHT' ? '#00ff88' :
+              d.clearance_path === 'NONE' ? '#ff3366' :
+              d.clearance_path === 'BLOCKED' ? '#ff3366' : '#00d4ff';
+          }
+          
+          // Update Line Sensor
+          if (Number.isFinite(d.line_raw)) el('kpiADC').textContent = Math.round(d.line_raw);
+          
+          // Line status indicator
+          const lineIndicator = el('lineIndicator');
+          if (d.on_line === 0 || d.on_line === 1) {
+            el('kpiLine').textContent = d.on_line ? 'ON' : 'OFF';
+            if (d.on_line) {
+              lineIndicator.classList.add('active');
+            } else {
+              lineIndicator.classList.remove('active');
+            }
+          }
+          
+          // Update Heading and Compass
+          if (Number.isFinite(d.heading)) {
+            el('kpiHeading').textContent = d.heading.toFixed(0);
+            el('compassNeedle').style.transform = `translate(-50%, -100%) rotate(${d.heading}deg)`;
+          }
+
+          // Update IMU Data
+          if (Number.isFinite(d.accel_x)) el('accelX').textContent = d.accel_x.toFixed(2) + ' g';
+          if (Number.isFinite(d.accel_y)) el('accelY').textContent = d.accel_y.toFixed(2) + ' g';
+          if (Number.isFinite(d.accel_z)) el('accelZ').textContent = d.accel_z.toFixed(2) + ' g';
+          if (Number.isFinite(d.tilt)) el('kpiTilt').textContent = d.tilt.toFixed(1) + 'deg';
+          
+          // Raw vs Filtered Heading
+          if (Number.isFinite(d.heading_raw)) el('rawHeading').textContent = d.heading_raw.toFixed(0) + 'deg';
+          if (Number.isFinite(d.heading_filtered)) {
+            el('filteredHeading').textContent = d.heading_filtered.toFixed(0) + 'deg';
+          } else if (Number.isFinite(d.heading)) {
+            // Use heading as filtered if heading_filtered not provided
+            el('filteredHeading').textContent = d.heading.toFixed(0) + 'deg';
+          }
+
+          // Calculate and display filter effectiveness (difference between raw and filtered)
+          if (Number.isFinite(d.heading_raw) && Number.isFinite(d.heading_filtered)) {
+            const diff = Math.abs(d.heading_raw - d.heading_filtered);
+            el('filterDiff').textContent = diff.toFixed(1) + 'deg';
+          } else if (Number.isFinite(d.heading_raw) && Number.isFinite(d.heading)) {
+            const diff = Math.abs(d.heading_raw - d.heading);
+            el('filterDiff').textContent = diff.toFixed(1) + 'deg';
+          }
+
+          appendTableRow(d);
+
+        } else if (t === currentLogTopic) {
+            appendToLog(logEventEl, txt);
+        }
+      } catch (e) {
+         appendToLog(logEventEl, `[Dashboard Error] Processing msg from ${t}: ${e.message}\n`);
+      }
+    });
+  }
+
+  function disconnectWS() {
+    if (client) {
+      try { client.end(true); } catch {}
+      client = null;
+    }
+    setConnState(false);
+  }
+
+  // Initialize
+  window.addEventListener('load', () => {
+    setConnState(false);
+    el('btnConnect').addEventListener('click', connectWS);
+    el('btnDisconnect').addEventListener('click', disconnectWS);
+    el('btnClearTbl').addEventListener('click', () => { if (evtTableBody) evtTableBody.innerHTML = ''; });
+    el('btnClearEvent').addEventListener('click', () => { if (logEventEl) logEventEl.textContent = ''; });
+    el('btnClearTelem').addEventListener('click', () => { if (logTelemetryEl) logTelemetryEl.textContent = ''; });
+  });
+})();
+</script>
+</body>
+</html>
