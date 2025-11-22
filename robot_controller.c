@@ -24,6 +24,7 @@
 #include "servo_control.h"
 #include "ultrasonic_sensor.h"
 #include "mqtt_handler.h"
+#include "barcode_direction.h"
 
 // ================== PID / LINE FOLLOWING (matches your original) ==================
 #define STRAIGHT_SPEED              43
@@ -81,7 +82,10 @@
 #define TELEMETRY_PAYLOAD_SIZE     768
 #define MQTT_PUB_PERIOD_MS         200
 #define DEBUG_PRINT_DIVISOR         25
-#define DT_ENC_US  20000u   
+#define DT_ENC_US  20000u
+
+// Barcode scanning
+#define DT_BARCODE_US   2000u   // Update barcode scanner every 2ms   
 
 
 // ================== States ==================
@@ -473,6 +477,11 @@ void robot_controller_init(void)
     cur_left_speed=cur_right_speed=0; smoothed_target_speed=STRAIGHT_SPEED;
     heading_locked=false; target_heading=0.0f; prev_lateral_accel=0.0f;
 
+    // Initialize and start continuous barcode scanning
+    barcode_direction_init();
+    barcode_direction_start_continuous();
+    robot_log("✓ Continuous barcode scanning enabled on GPIO28\n");
+
     robot_log("\n=== Controller Ready (Always-sweeping ultrasonic) — Thr=%.0f cm ===\n",
               OBSTACLE_THRESHOLD_CM);
     robot_mqtt_publish_qos(MQTT_TOPIC_STATE, "{\"status\":\"following\"}", 1, 1);
@@ -487,7 +496,7 @@ void robot_controller_run_loop(void)
     uint32_t loop_counter=0;
 
     uint32_t t_pid=time_us_32(), t_imu=t_pid, t_net=t_pid, t_mqtt=t_pid;
-    uint32_t t_enc=t_pid;
+    uint32_t t_enc=t_pid, t_barcode=t_pid;
 
     while(true){
         loop_counter++;
@@ -496,6 +505,34 @@ void robot_controller_run_loop(void)
         if(time_us_32()-t_net >= DT_NET_US){ mqtt_maintain_connection(); cyw43_arch_poll(); t_net+=DT_NET_US; }
         if(time_us_32()-t_imu >= DT_IMU_US){ imu_read(); t_imu+=DT_IMU_US; }
         if (time_us_32()-t_enc >= DT_ENC_US)  { encoder_update_kinematics();                    t_enc  += DT_ENC_US; }
+
+        // Update barcode scanner (non-blocking)
+        if(time_us_32()-t_barcode >= DT_BARCODE_US){
+            barcode_result_t* bc_result = barcode_direction_update();
+            if(bc_result != NULL && bc_result->status == BC_STATUS_OK){
+                // Barcode detected and decoded!
+                const char* dir_str = barcode_direction_string(bc_result->move_dir);
+                const char* scan_str = barcode_scan_direction_string(bc_result->scan_dir);
+
+                robot_log("\n🔍 BARCODE DETECTED: \"%s\" | %s | Scan: %s\n",
+                         bc_result->data, dir_str, scan_str);
+
+                // Publish to MQTT
+                if(mqtt_is_connected()){
+                    char bc_payload[256];
+                    snprintf(bc_payload, sizeof(bc_payload),
+                        "{\"barcode\":\"%s\",\"direction\":\"%s\",\"scan_dir\":\"%s\",\"move_dir\":%d,\"bar_count\":%d}",
+                        bc_result->data,
+                        dir_str,
+                        scan_str,
+                        (int)bc_result->move_dir,
+                        bc_result->bar_count
+                    );
+                    robot_mqtt_publish_qos("robocar/barcode", bc_payload, 1, 1);
+                }
+            }
+            t_barcode += DT_BARCODE_US;
+        }
 
         switch(g_master_state){
             case STATE_LINE_FOLLOWING:  handle_line_following(&loop_counter,&next_pub); break;

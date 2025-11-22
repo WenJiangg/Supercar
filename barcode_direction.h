@@ -210,4 +210,46 @@ void barcode_direction_set_threshold(uint16_t threshold);
  */
 uint16_t barcode_direction_get_threshold(void);
 
+// ==============================================================================
+// Non-Blocking Continuous Scanning API
+// ==============================================================================
+
+/**
+ * @brief Start continuous non-blocking barcode scanning
+ *
+ * This enables background barcode scanning that runs without blocking
+ * your robot's main control loop. Call barcode_direction_update() regularly
+ * to process scanning.
+ */
+void barcode_direction_start_continuous(void);
+
+/**
+ * @brief Stop continuous scanning
+ */
+void barcode_direction_stop_continuous(void);
+
+/**
+ * @brief Update the barcode scanner state machine (call regularly in main loop)
+ *
+ * This function should be called frequently (e.g., every 1-5ms) from your
+ * main control loop. It processes the scanner state machine and detects
+ * barcodes without blocking.
+ *
+ * @return barcode_result_t* Pointer to result if barcode was just decoded,
+ *                           NULL if still scanning or idle
+ */
+barcode_result_t* barcode_direction_update(void);
+
+/**
+ * @brief Check if continuous scanning is active
+ *
+ * @return bool true if scanning is active
+ */
+bool barcode_direction_is_scanning(void);
+
+/**
+ * @brief Reset the continuous scanner (clears current scan data)
+ */
+void barcode_direction_reset(void);
+
 #endif // BARCODE_DIRECTION_H

@@ -104,6 +104,28 @@ static uint16_t white_calibration = 500;    // Calibrated white value
 static uint16_t black_calibration = 3500;   // Calibrated black value
 
 // ==============================================================================
+// Non-Blocking Continuous Scanning State Machine
+// ==============================================================================
+
+typedef enum {
+    SCAN_STATE_IDLE = 0,        // Not scanning
+    SCAN_STATE_WAITING,         // Waiting for first bar
+    SCAN_STATE_CAPTURING,       // Capturing bars
+    SCAN_STATE_PROCESSING,      // Decoding captured data
+    SCAN_STATE_COMPLETE         // Scan complete, result ready
+} scan_state_t;
+
+static scan_state_t continuous_scan_state = SCAN_STATE_IDLE;
+static barcode_result_t continuous_result;
+static bool last_sensor_state_continuous = false;
+static absolute_time_t last_transition_time;
+static uint32_t stable_white_time_us = 0;
+static bool continuous_scanning_enabled = false;
+
+#define BARCODE_END_TIMEOUT_US  15000  // 15ms of white = end of barcode
+#define BARCODE_START_MIN_US    100    // Minimum width to start barcode
+
+// ==============================================================================
 // Private Function Declarations
 // ==============================================================================
 
@@ -443,6 +465,174 @@ void barcode_direction_set_threshold(uint16_t threshold) {
 
 uint16_t barcode_direction_get_threshold(void) {
     return adc_threshold;
+}
+
+// ==============================================================================
+// Non-Blocking Continuous Scanning Implementation
+// ==============================================================================
+
+void barcode_direction_start_continuous(void) {
+    continuous_scanning_enabled = true;
+    continuous_scan_state = SCAN_STATE_WAITING;
+    memset(&continuous_result, 0, sizeof(barcode_result_t));
+    last_sensor_state_continuous = barcode_direction_read_sensor();
+    last_transition_time = get_absolute_time();
+    stable_white_time_us = 0;
+}
+
+void barcode_direction_stop_continuous(void) {
+    continuous_scanning_enabled = false;
+    continuous_scan_state = SCAN_STATE_IDLE;
+}
+
+bool barcode_direction_is_scanning(void) {
+    return continuous_scanning_enabled;
+}
+
+void barcode_direction_reset(void) {
+    if (continuous_scanning_enabled) {
+        continuous_scan_state = SCAN_STATE_WAITING;
+        memset(&continuous_result, 0, sizeof(barcode_result_t));
+        last_sensor_state_continuous = barcode_direction_read_sensor();
+        last_transition_time = get_absolute_time();
+        stable_white_time_us = 0;
+    }
+}
+
+barcode_result_t* barcode_direction_update(void) {
+    if (!continuous_scanning_enabled) {
+        return NULL;
+    }
+
+    bool current_state = barcode_direction_read_sensor();
+    absolute_time_t current_time = get_absolute_time();
+
+    switch (continuous_scan_state) {
+        case SCAN_STATE_IDLE:
+            // Should not be here if scanning is enabled
+            continuous_scan_state = SCAN_STATE_WAITING;
+            break;
+
+        case SCAN_STATE_WAITING:
+            // Wait for first black bar transition
+            if (current_state != last_sensor_state_continuous) {
+                uint32_t width_us = absolute_time_diff_us(last_transition_time, current_time);
+
+                // Start capturing when we see a significant black bar
+                if (current_state == true && width_us > BARCODE_START_MIN_US) {
+                    continuous_scan_state = SCAN_STATE_CAPTURING;
+                    continuous_result.bar_count = 0;
+                    continuous_result.scan_duration_ms = 0;
+                }
+
+                last_transition_time = current_time;
+            }
+            break;
+
+        case SCAN_STATE_CAPTURING:
+            // Detect state transitions and capture bars
+            if (current_state != last_sensor_state_continuous) {
+                uint32_t width_us = absolute_time_diff_us(last_transition_time, current_time);
+
+                // Record valid bars/spaces
+                if (width_us >= BC_DIR_MIN_BAR_WIDTH && width_us <= BC_DIR_MAX_BAR_WIDTH) {
+                    if (continuous_result.bar_count < BC_DIR_MAX_BARS) {
+                        continuous_result.bars[continuous_result.bar_count].width_us = width_us;
+                        continuous_result.bars[continuous_result.bar_count].is_black = last_sensor_state_continuous;
+                        continuous_result.bars[continuous_result.bar_count].is_wide = false;
+                        continuous_result.bar_count++;
+                    }
+
+                    stable_white_time_us = 0;
+                } else if (!current_state && width_us > BARCODE_END_TIMEOUT_US) {
+                    // Long white space = end of barcode
+                    if (continuous_result.bar_count >= 20) {
+                        continuous_scan_state = SCAN_STATE_PROCESSING;
+                    } else {
+                        // Too few bars, restart
+                        continuous_scan_state = SCAN_STATE_WAITING;
+                        continuous_result.bar_count = 0;
+                    }
+                }
+
+                last_transition_time = current_time;
+            } else if (!current_state) {
+                // Check for end timeout during stable white
+                uint32_t white_duration = absolute_time_diff_us(last_transition_time, current_time);
+                if (white_duration > BARCODE_END_TIMEOUT_US && continuous_result.bar_count >= 20) {
+                    continuous_scan_state = SCAN_STATE_PROCESSING;
+                }
+            }
+            break;
+
+        case SCAN_STATE_PROCESSING:
+            // Decode the captured bars
+            continuous_result.avg_narrow_width_us = calculate_avg_narrow_width(
+                continuous_result.bars, continuous_result.bar_count);
+            continuous_result.threshold_us = continuous_result.avg_narrow_width_us * 3 / 2;
+
+            classify_bars_wide_narrow(continuous_result.bars,
+                                      continuous_result.bar_count,
+                                      continuous_result.threshold_us);
+
+            // Try forward decode
+            bool forward_ok = decode_code39_forward(continuous_result.bars,
+                                                    continuous_result.bar_count,
+                                                    continuous_result.data,
+                                                    BC_DIR_MAX_DATA_LEN);
+
+            if (forward_ok) {
+                continuous_result.scan_dir = SCAN_FORWARD;
+                continuous_result.status = BC_STATUS_OK;
+            } else {
+                // Try reverse decode
+                bool reverse_ok = decode_code39_reverse(continuous_result.bars,
+                                                       continuous_result.bar_count,
+                                                       continuous_result.data,
+                                                       BC_DIR_MAX_DATA_LEN);
+
+                if (reverse_ok) {
+                    continuous_result.scan_dir = SCAN_REVERSE;
+                    continuous_result.status = BC_STATUS_OK;
+                } else {
+                    continuous_result.status = BC_STATUS_INVALID_PATTERN;
+                    continuous_result.data[0] = '\0';
+                }
+            }
+
+            if (continuous_result.status == BC_STATUS_OK) {
+                continuous_result.data_length = strlen(continuous_result.data);
+                continuous_result.move_dir = determine_movement_direction(continuous_result.data);
+            } else {
+                continuous_result.data_length = 0;
+                continuous_result.move_dir = MOVE_NONE;
+            }
+
+            continuous_scan_state = SCAN_STATE_COMPLETE;
+            break;
+
+        case SCAN_STATE_COMPLETE:
+            // Result is ready - will be returned this cycle
+            // Then automatically restart scanning
+            break;
+    }
+
+    last_sensor_state_continuous = current_state;
+
+    // Return result if complete, then restart
+    if (continuous_scan_state == SCAN_STATE_COMPLETE) {
+        barcode_result_t* result_ptr = &continuous_result;
+
+        // Restart scanning for next barcode
+        continuous_scan_state = SCAN_STATE_WAITING;
+        memset(&continuous_result, 0, sizeof(barcode_result_t));
+        last_transition_time = get_absolute_time();
+        stable_white_time_us = 0;
+
+        return result_ptr;
+    }
+
+    return NULL;
 }
 
 // ==============================================================================

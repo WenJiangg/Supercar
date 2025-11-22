@@ -12,6 +12,9 @@ This module provides comprehensive CODE39 barcode decoding with automatic direct
 - ✅ **Bidirectional Scanning** - Detects and handles forward/reverse scans
 - ✅ **Movement Direction Mapping** - Automatic LEFT/RIGHT commands based on characters
 - ✅ **Easy Calibration** - Interactive white/black calibration routine
+- ✅ **Continuous Non-Blocking Scanning** - Scans while robot is line following
+- ✅ **MQTT Integration** - Automatic publishing of barcode results
+- ✅ **Real-time Detection** - Updates every 2ms without blocking movement
 
 ## Hardware Setup
 
@@ -134,9 +137,87 @@ Reads sensor state (true = black, false = white).
 #### `void barcode_direction_set_threshold(uint16_t threshold)`
 Sets ADC threshold for black/white detection.
 
+## Continuous Scanning Mode (Recommended for RoboCar)
+
+The barcode scanner is integrated into the robot controller and runs continuously while your car is line following. This mode is **automatically enabled** when you initialize the robot controller.
+
+### How It Works
+
+1. **Non-Blocking** - Scanner runs in background, never blocks PID control
+2. **Automatic Detection** - Detects barcodes as they pass under GPIO28 sensor
+3. **MQTT Publishing** - Results automatically published to `robocar/barcode` topic
+4. **Auto-Reset** - After detecting a barcode, automatically starts scanning for the next one
+
+### Integration (Already Done in robot_controller.c)
+
+```c
+// In robot_controller_init():
+barcode_direction_init();
+barcode_direction_start_continuous();
+
+// In robot_controller_run_loop() (called every 2ms):
+barcode_result_t* result = barcode_direction_update();
+if (result != NULL && result->status == BC_STATUS_OK) {
+    // Barcode detected!
+    printf("Barcode: %s | %s\n",
+           result->data,
+           barcode_direction_string(result->move_dir));
+
+    // Publish to MQTT
+    // ... (automatic in robot_controller.c)
+}
+```
+
+### MQTT Message Format
+
+When a barcode is detected, the following JSON is published to `robocar/barcode`:
+
+```json
+{
+    "barcode": "ABC",
+    "direction": "MOVE RIGHT",
+    "scan_dir": "FORWARD (L→R)",
+    "move_dir": 1,
+    "bar_count": 45
+}
+```
+
+**Fields:**
+- `barcode` - Decoded string
+- `direction` - Human-readable movement command
+- `scan_dir` - Scan direction (forward/reverse)
+- `move_dir` - Integer: 0=NONE, 1=RIGHT, 2=LEFT
+- `bar_count` - Number of bars captured
+
+### Manual Control
+
+If you want to manually control continuous scanning:
+
+```c
+// Start continuous scanning
+barcode_direction_start_continuous();
+
+// In your main loop
+barcode_result_t* result = barcode_direction_update();
+if (result != NULL) {
+    // Process result
+}
+
+// Stop continuous scanning
+barcode_direction_stop_continuous();
+
+// Reset scanner (clear current scan data)
+barcode_direction_reset();
+
+// Check if scanning is active
+if (barcode_direction_is_scanning()) {
+    // Scanning is active
+}
+```
+
 ## Usage Examples
 
-### Example 1: Basic Scan
+### Example 1: Basic Scan (Blocking Mode)
 
 ```c
 barcode_result_t result = barcode_direction_scan(5000);
